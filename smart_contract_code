@@ -1,0 +1,128 @@
+pragma solidity >=0.4.22 <0.6.0;
+
+contract selling_carrot{
+    address payable contract_ID;//合約id
+    address payable farmer_ID;//農夫id
+    address payable COA_ID;//農委會id
+    address payable deliver_ID;//運送id
+    address payable consumer_ID;//客戶id
+    //order_states:
+    //empty(0) >> new_carrot(1) >> good_carrot(2) / bad_carrot(3) >> buy_carrot >> 
+    //farmer_send_carrot >> deliver_send_carrot
+    //comsumer_recieve_carrot >> money_send_finshed
+    //string []order_state_s = ["empty", "new_carrot", "good_carrot", "buy_carrot" ,"farmer_send_carrot" , "deliver_send_carrot","comsumer_recieve_carrot" , "money_send_finshed"];
+    
+    uint carrot_money; //蘿蔔幣
+    uint carrot_number=0;//蘿蔔數量
+    uint buy_carrot_number;//蘿蔔的銷售量
+    bool return_picture;//退貨流程
+    string order_state = "empty"; //empty >> new_carrot >> good_carrot >> buy_carrot >> 
+                                //farmer_send_carrot >> deliver_send_carrot
+                                 //comsumer_recieve_carrot >> money_send >> finshed
+    
+    constructor()public payable{
+        contract_ID = msg.sender;//部屬合約
+    }
+   
+    function _Add_COA() public payable{
+        COA_ID = msg.sender;//將農委會加進合約
+        require(address(this).balance >= 0.0001 ether,"No money!");
+        //驗證農委會是否有足夠的錢繳保證金
+        contract_ID.transfer(0.0001 ether); //for guarantee
+    } 
+    
+    function _Add_farmer(uint _carrot_money, uint _carrot_number) public payable{
+        farmer_ID = msg.sender;//將農夫加進合約
+        require(address(this).balance >= 0.0001 ether && keccak256(bytes(order_state))==keccak256("empty"),"fail!");
+        //驗證農夫是否有錢與狀態是否非empty
+        contract_ID.transfer(0.0001 ether);//for guarantee
+        carrot_money = _carrot_money;
+        carrot_number = _carrot_number;
+        order_state = "new_carrot";
+    } 
+   
+    function _Add_deliver() public payable{
+        deliver_ID = msg.sender;//將運送id加進合約
+        require(address(this).balance >= 0.0001 ether && keccak256(bytes(order_state))==keccak256("buy_carrot"),"fail!");
+        //驗證運送者是否有錢與狀態是否非buy_carrot
+        contract_ID.transfer(0.0001 ether);//for guarantee
+    } 
+   
+    function _Add_consumer_and_Buy(uint _buy_carrot_number)public payable{
+        require(keccak256(bytes(order_state))==keccak256("good_carrot"),"No carrot for sell");
+        //驗證是否為品質好的蘿蔔，否則回傳錯誤
+        require(_buy_carrot_number>carrot_number,"No this much carrot!");
+        //驗證蘿蔔數量是否足夠賣，否則回傳錯誤
+        require(address(this).balance > (carrot_money * _buy_carrot_number + 0.00005 ether),"No money!"); 
+        //50（運費） for delievr
+        
+        consumer_ID = msg.sender; //將顧客加進合約
+        contract_ID.transfer(carrot_money*_buy_carrot_number +0.00005 ether);//加50元進入訂單金額
+        buy_carrot_number = _buy_carrot_number;
+        carrot_number -= _buy_carrot_number;
+        order_state = "buy_carrot"; //將狀態改為buy_carrot
+    } 
+    
+    //order_states:
+    //empty >> new_carrot >> good_carrot / bad_carrot >> buy_carrot >> 
+    //farmer_send_carrot >> deliver_send_carrot
+    //comsumer_recieve_carrot >> money_send_finshed
+    //return of carrot:
+    //return_picture = false >> return_upload_picture >> 
+    //you_can_change/cannot_change >> return_deliver_send_carrot >>
+    //return_recieve_carrot >> finshed
+    
+    function _change_order_state(bool _yes_or_no)public payable {
+        if(msg.sender==farmer_ID){
+            if(keccak256(bytes(order_state))==keccak256("buy_carrot") && _yes_or_no){
+                order_state = "farmer_send_carrot";
+                
+            }
+            else if(keccak256(bytes(order_state))==keccak256("return_upload_picture") && _yes_or_no){
+                    if(_yes_or_no == true){
+                        order_state = "you_can_change";
+                        return_picture = true;
+                    }
+                    else if(_yes_or_no == false){
+                        order_state = "cannot_change";
+                        return_picture =false;
+                    }
+            }
+        }
+        else if(msg.sender==COA_ID){
+            if(keccak256(bytes(order_state))==keccak256("new_carrot") && _yes_or_no){
+                order_state = "good_carrot";
+            }
+            else if(keccak256(bytes(order_state))==keccak256("new_carrot") && !_yes_or_no){
+                order_state = "bad_carrot";
+            }
+        }
+        else if(msg.sender==deliver_ID){
+            if(keccak256(bytes(order_state))==keccak256("farmer_send_carrot") && _yes_or_no){
+                order_state = "deliver_send_carrot";
+            }
+            else if(keccak256(bytes(order_state))==keccak256("you_can_change") && _yes_or_no){
+                order_state = "return_deliver_send_carrot";
+            }
+        }
+        else if(msg.sender==consumer_ID){
+            if(keccak256(bytes(order_state))==keccak256("deliver_send_carrot") && _yes_or_no){
+                order_state = "comsumer_recieve_carrot";
+            }
+            else if(keccak256(bytes(order_state))==keccak256("comsumer_recieve_carrot") && _yes_or_no){
+                return_picture = false;   
+                order_state = "return_upload_picture";
+            }
+            else if(keccak256(bytes(order_state))==keccak256("return_deliver_send_carrot") && _yes_or_no){
+                order_state = "return_recieve_carrot";
+            }
+        }
+        else if(msg.sender==contract_ID){
+            if(keccak256(bytes(order_state))==keccak256("comsumer_recieve_carrot") && _yes_or_no){
+                farmer_ID.transfer(carrot_money*buy_carrot_number);
+                deliver_ID.transfer(0.00005 ether);
+                order_state = "money_send_finshed";
+            }
+        }
+    }
+}
