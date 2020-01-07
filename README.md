@@ -11,3 +11,9 @@
 1051562 藍勤智	   |	12%	|	想退貨流程、研究code
 1061553 黃品魁	   |	15%	|	想下訂單流程、畫流程圖、協助打註解
 1063351 張宇翔	   |	12%	|	想下訂單流程、研究code
+
+## 操作步驟
+
+![](https://i.imgur.com/Y4txCYe.png)
+![](https://i.imgur.com/fYgZb22.png)
+![](https://i.imgur.com/aoIkWnR.png)
